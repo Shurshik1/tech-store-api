@@ -1,4 +1,3 @@
-// 1. ИМПОРТЫ (Я написал их за тебя, их зубрить не нужно, IDE обычно подставляет их сама)
 import express, { Request, response, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
@@ -29,7 +28,11 @@ app.get('/api/products', async (req: Request, res: Response) => {
         // Подсказка: Обратись к prisma, выбери модель product и вызови метод findMany()
         // Не забудь использовать await, так как база отвечает не мгновенно!
         // const products = await fetch ('prisma', findMany());
-        const products = await prisma.product.findMany();
+        const products = await prisma.product.findMany({
+            include: {
+        category: true // Просим Присму: "Подтяни сюда все данные о категории!"
+    }
+        });
         
         // Подсказка: Отправь полученные products обратно клиенту в формате JSON
         res.json(products);
@@ -64,6 +67,21 @@ app.get('/api/products/:id', async (req: Request, res: Response) =>{
     }
 });
 
+app.patch('/api/products/:id', async (req, res) => {
+    try{
+        const productId = Number(req.params.id);
+        const { price } = req.body;
+        const updatedProduct = await prisma.product.update({
+            where: {id:productId},
+            data: {price: Number(price)}
+        });
+        res.json(updatedProduct);
+    }catch(error){
+        res.status(500).json({error: 'Ошибка обновления'});
+
+    }
+});
+
 app.delete('/api/products/:id', async (req: Request, res: Response)=>{
     try {
         const productId = Number(req.params.id);
@@ -82,23 +100,36 @@ app.delete('/api/products/:id', async (req: Request, res: Response)=>{
 });
 
 app.post('/api/products', async (req: Request, res: Response) => {
-
     try {
-        const { name, price } = req.body;
+        // 1. Достаем из запроса еще и categoryId
+        const { name, price, categoryId } = req.body; 
+        
         const newProduct = await prisma.product.create({
-    data: {
-        name: name,
-        price: price
-        // availability передавать не нужно, база сама поставит true!
-    }
-});
-    res.json(newProduct);
+            data: {
+                name: name,
+                price: price,
+                // 2. Обязательно передаем его в Присму!
+                categoryId: categoryId 
+            }
+        });
+        
+        res.json(newProduct);
     } catch (error) {
         res.status(500).json({ error: 'Ошибка сервера' });
     }
-
 });
 
+app.post('/api/categories', async (req: Request, res: Response) => {
+   try{ 
+    const {name} = req.body;
+    const newCategory = await prisma.category.create({
+        data: {name: name}
+    });
+    res.json(newCategory);
+   }catch (error) {
+    res.status(500).json({error: 'Ошибка сервера'});
+   }
+});
 
 // 5. ЗАПУСК СЕРВЕРА
 // Подсказка: Заставь app слушать (listen) твой PORT
