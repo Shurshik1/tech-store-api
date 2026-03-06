@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой Магазин Гаджетов</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+        }
+        h1, h2 { text-align: center; color: #333; }
+        
+        .form-container {
+            max-width: 500px; margin: 0 auto 30px auto;
+            background: white; padding: 20px;
+            border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .form-group { margin-bottom: 15px; }
+        input {
+            width: 100%; padding: 10px; margin-top: 5px;
+            border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;
+        }
+        button {
+            width: 100%; padding: 10px; background-color: #3498db;
+            color: white; border: none; border-radius: 5px; font-size: 1em; cursor: pointer; transition: background 0.2s;
+        }
+        button:hover { background-color: #2980b9; }
+
+        
+
+        .products-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px; max-width: 1000px; margin: 0 auto;
+        }
+        .card {
+            background: white; padding: 20px; border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s;
+            display: flex; flex-direction: column; /* Чтобы кнопка всегда была внизу */
+        }
+        .card:hover { transform: translateY(-5px); }
+        .price { color: #27ae60; font-size: 1.2em; font-weight: bold; flex-grow: 1; }
+        .category { font-size: 0.8em; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Стили для нашей новой кнопки удаления */
+        .delete-btn {
+            background-color: #e74c3c;
+            margin-top: 15px;
+        }
+        .delete-btn:hover {
+            background-color: #c0392b;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>📱 Каталог Гаджетов</h1>
+
+    <div class="form-container">
+        <h2>Добавить новый товар</h2>
+        <form id="addForm">
+            <div class="form-group">
+                <input type="text" id="nameInput" placeholder="Название (например, iPhone 15)" required>
+            </div>
+            <div class="form-group">
+                <input type="number" id="priceInput" placeholder="Цена (например, 40000)" required>
+            </div>
+            <div class="form-group">
+                <input type="number" id="categoryInput" placeholder="ID Категории (1 - Ноутбуки)" required>
+            </div>
+            <select id="statusInput">
+                <option value="IN_STOCK">В наличии</option>
+                <option value="OUT_OF_STOCK">Закончился</option>
+                <option value="PRE_ORDER">Предзаказ</option>
+            </select>
+            <button type="submit">Создать товар</button>
+        </form>
+    </div>
+    
+    <div class="filters" style="text-align: center; margin-bottom: 20px;">
+        <button onclick="loadProducts('')" style="width: auto; display: inline-block; margin: 5px;">Все</button>
+        <button onclick="loadProducts('IN_STOCK')" style="width: auto; display: inline-block; margin: 5px; background-color: #27ae60;">В наличии</button>
+        <button onclick="loadProducts('OUT_OF_STOCK')" style="width: auto; display: inline-block; margin: 5px; background-color: #e67e22;">Закончился</button>
+        <button onclick="loadProducts('PRE_ORDER')" style="width: auto; display: inline-block; margin: 5px; background-color: #f1c40f;">Предзаказ</button>
+    </div>
+
+    <input type="text" id="searchInput" placeholder="Поиск по названию..." 
+       oninput="loadProducts(undefined, this.value)" 
+       style="padding: 10px; border-radius: 5px; border: 1px solid #ccc; width: 200px;">
+
+    <select id="sortInput" onchange="loadProducts(undefined, undefined, this.value)">
+    <option value="asc">Сначала дешевые</option>
+    <option value="desc">Сначала дорогие</option>
+    </select>
+
+    <div id="products-container" class="products-grid">
+        <p style="text-align: center; grid-column: 1 / -1;">Загрузка товаров...</p>
+    </div>
+
+    <script>
+        let currentStatus = '';
+        let currentSearch = '';
+        let currentSort = 'asc';
+
+        // 1. ЗАГРУЗКА ТОВАРОВ
+        async function loadProducts(status = currentStatus, search = currentSearch, sort = currentSort) {
+            currentSearch  = search;
+            currentStatus = status;
+            currentSort = sort;
+            try {
+
+                let url = `/api/products?status=${currentStatus}&search=${currentSearch}&sort=${currentSort}`;
+                if (currentStatus) {
+                    url += `?status=${currentStatus}`;
+                if (currentSearch) {
+                    url += `&search=${encodeURIComponent(currentSearch)}`;
+                    }
+                }        
+
+                const response = await fetch(url);
+                const products = await response.json();
+                const container = document.getElementById('products-container');
+                container.innerHTML = ''; 
+
+                products.forEach(product => {
+                    const categoryName = product.category ? product.category.name : 'Без категории';
+                    
+                    
+                    // ДОБАВИЛИ КНОПКУ УДАЛЕНИЯ В HTML КАРТОЧКИ
+                    const card = `
+                        <div class="card">
+                            <div class="category">${categoryName}</div>
+                            <h2>${product.status}</h2>
+                            <h2>${product.name}</h2>
+                            <p class="price">${product.price} ₴</p>
+                            <button class="delete-btn" onclick="deleteProduct(${product.id})">🗑️ Удалить</button>
+                        </div>
+                    `;
+                    container.innerHTML += card;
+                });
+            } catch (error) {
+                console.error('Ошибка:', error);
+            }
+        }
+
+        // 2. НОВАЯ ФУНКЦИЯ УДАЛЕНИЯ ТОВАРА
+        async function deleteProduct(id) {
+            // Спрашиваем пользователя, уверен ли он
+            const isConfirmed = confirm('Ты уверен, что хочешь удалить этот товар?');
+            if (!isConfirmed) return; // Если нажал "Отмена", прекращаем работу
+
+            try {
+                // Отправляем DELETE запрос на сервер с нужным ID
+                const response = await fetch(`/api/products/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    // Если удалилось успешно — просто заново загружаем список товаров!
+                    loadProducts();
+                } else {
+                    alert('Ошибка при удалении товара на сервере!');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Не удалось подключиться к серверу');
+            }
+        }
+
+        // 3. ДОБАВЛЕНИЕ ТОВАРА (Осталось без изменений)
+        const form = document.getElementById('addForm');
+        form.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const newName = document.getElementById('nameInput').value;
+            const newPrice = document.getElementById('priceInput').value;
+            const newCategoryId = document.getElementById('categoryInput').value;
+            const newStatus = document.getElementById('statusInput').value;
+
+            try {
+                const response = await fetch('/api/products', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: newName,
+                        price: newPrice,
+                        categoryId: newCategoryId,
+                        status: newStatus
+                    })
+                });
+
+                if (response.ok) {
+                    form.reset();
+                    loadProducts();
+                } else {
+                    alert('Ошибка при создании товара. Проверь, существует ли ID категории!');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Не удалось подключиться к серверу');
+            }
+        });
+
+        // Первый запуск
+        loadProducts();
+    </script>
+</body>
+</html>

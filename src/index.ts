@@ -1,5 +1,5 @@
 import express, { Request, response, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, ProductStatus } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import 'dotenv/config'; 
@@ -11,7 +11,7 @@ const PORT = 3000;
 
 // Подсказка: Научи свой app понимать JSON-формат (используй метод use и express.json())
 app.use(express.json());
-
+app.use(express.static('public'));
 // 3. ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ (Специфика Prisma 7)
 const connectionString = process.env.DATABASE_URL;
 // Подсказка: Создай новый Pool, передав ему объект с connectionString
@@ -25,13 +25,22 @@ const prisma = new PrismaClient({adapter});
 // Подсказка: Вызови метод get у app. Укажи путь '/api/products'.
 app.get('/api/products', async (req: Request, res: Response) => {
     try {
+        const {status, search, sort} = req.query;
         // Подсказка: Обратись к prisma, выбери модель product и вызови метод findMany()
         // Не забудь использовать await, так как база отвечает не мгновенно!
         // const products = await fetch ('prisma', findMany());
         const products = await prisma.product.findMany({
-            include: {
-        category: true // Просим Присму: "Подтяни сюда все данные о категории!"
-    }
+            where: {
+                status: status ? (status as ProductStatus) : undefined,
+                name: search ? {
+                    contains: String(search),
+                    mode: 'insensitive'
+                } : undefined
+            },
+            include: { category: true },
+            orderBy: {
+                price: sort === 'desc' ? 'desc' : 'asc'
+            }
         });
         
         // Подсказка: Отправь полученные products обратно клиенту в формате JSON
@@ -102,19 +111,21 @@ app.delete('/api/products/:id', async (req: Request, res: Response)=>{
 app.post('/api/products', async (req: Request, res: Response) => {
     try {
         // 1. Достаем из запроса еще и categoryId
-        const { name, price, categoryId } = req.body; 
+        const { name, price, categoryId, status } = req.body; 
         
         const newProduct = await prisma.product.create({
             data: {
                 name: name,
-                price: price,
+                price: Number(price),
                 // 2. Обязательно передаем его в Присму!
-                categoryId: categoryId 
+                categoryId: Number(categoryId),
+                status: status || ProductStatus.IN_STOCK
             }
         });
         
         res.json(newProduct);
     } catch (error) {
+        console.error("Ошибка при создании товара", error);
         res.status(500).json({ error: 'Ошибка сервера' });
     }
 });
